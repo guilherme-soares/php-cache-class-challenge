@@ -1,5 +1,7 @@
 <?php
 
+require "RedisCache.class.php";
+
 class SimpleJsonRequest
 {
     private static function makeRequest(string $method, string $url, array $parameters = null, array $data = null)
@@ -13,7 +15,18 @@ class SimpleJsonRequest
         ];
 
         $url .= ($parameters ? '?' . http_build_query($parameters) : '');
-        return file_get_contents($url, false, stream_context_create($opts));
+
+        // Checking if the request response is in cache
+        $redisCache = new RedisCache();
+        if ($redisCache->isResponseCached($url)) {
+            return $redisCache->getCachedResponse($url);
+        }
+
+        // Make the request and store its response
+        $response = file_get_contents($url, false, stream_context_create($opts));
+        $redisCache->cacheResponse($url, $response);
+
+        return $response;
     }
 
     public static function get(string $url, array $parameters = null)
